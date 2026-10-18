@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mass studies: карта методів формотворення</title>
+<style>
+:root{--bg:#eef1f2;--ink:#17262e;--mute:#5d6e77;--line:#9fb0b8;--node:#fff;--ok:#2f7d5b;--chk:#c27a12;--acc:#1c5d8a;--panel:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#12171a;--ink:#e3ebee;--mute:#8fa1a9;--line:#41535b;--node:#1b2328;--ok:#4fb88a;--chk:#e0a042;--acc:#6fb2e0;--panel:#1b2328}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",system-ui,sans-serif;display:grid;grid-template-columns:1fr 340px;grid-template-rows:auto 1fr}
+header{grid-column:1/3;padding:12px 18px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+h1{font:600 17px/1.2 Georgia,"Times New Roman",serif;margin:0 auto 0 0}
+button{font:inherit;color:var(--ink);background:none;border:1px solid var(--line);padding:4px 10px;cursor:pointer}
+button:hover,button:focus-visible{border-color:var(--acc);outline:none}
+.lg{color:var(--mute);font-size:12px;display:flex;gap:12px}
+.lg i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+#map{overflow:auto;padding:16px}
+aside{border-left:1px solid var(--line);background:var(--panel);padding:18px;overflow:auto}
+aside h2{font:600 18px/1.25 Georgia,serif;margin:0 0 6px}
+aside dt{color:var(--mute);font-size:12px;margin-top:10px}
+aside dd{margin:0}
+aside a{color:var(--acc)}
+.badge{font-size:12px;padding:1px 7px;border:1px solid currentColor}
+.node rect{fill:var(--node);stroke:var(--line);stroke-width:1}
+.node{cursor:pointer}
+.node:hover rect,.node.sel rect{stroke:var(--acc);stroke-width:1.6}
+.node text{fill:var(--ink);font-size:13px}
+.node .cnt{fill:var(--mute);font-size:11px}
+.link{fill:none;stroke:var(--line);stroke-width:1.2}
+@media (max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto 1fr 40vh}header{grid-column:1}aside{border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Mass studies: методи формотворення</h1>
+  <span class="lg"><span><i style="background:var(--ok)"></i>є авторське визначення</span><span><i style="background:var(--chk)"></i>треба перевірити</span></span>
+  <button id="ea">Розгорнути все</button><button id="ca">Згорнути</button>
+</header>
+<div id="map"><svg id="svg" role="tree" aria-label="Карта методів"></svg></div>
+<aside id="info"></aside>
+<script src="data.js"></script>
+<script>
+const NW=220,NH=30,GX=56,GY=10,NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("svg"),info=document.getElementById("info");
+let sel=null;
+const kids=n=>n.children&&!n.collapsed?n.children:[];
+function init(n,d){n.d=d;if(n.children){n.collapsed=d>=1&&d>=2;n.children.forEach(c=>init(c,d+1));}}
+function layout(n,d,s){n.d=d;const k=kids(n);if(!k.length){n.y=s.y;s.y+=NH+GY}else{k.forEach(c=>layout(c,d+1,s));n.y=(k[0].y+k[k.length-1].y)/2}s.max=Math.max(s.max,d)}
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e}
+function draw(){
+  svg.innerHTML="";const s={y:0,max:0};layout(DATA,0,s);
+  svg.setAttribute("width",(s.max+1)*(NW+GX));svg.setAttribute("height",s.y);
+  (function walk(n){
+    const x=n.d*(NW+GX);
+    kids(n).forEach(c=>{const x2=c.d*(NW+GX);
+      el("path",{class:"link",d:`M${x+NW},${n.y+NH/2}C${x+NW+GX/2},${n.y+NH/2} ${x2-GX/2},${c.y+NH/2} ${x2},${c.y+NH/2}`},svg);walk(c)});
+  })(DATA);
+  (function walk(n){
+    const x=n.d*(NW+GX);
+    const g=el("g",{class:"node"+(n===sel?" sel":""),role:"treeitem",tabindex:0},svg);
+    el("rect",{x,y:n.y,width:NW,height:NH},g);
+    if(n.status)el("rect",{x,y:n.y,width:4,height:NH,fill:n.status==="ok"?"var(--ok)":"var(--chk)",style:"stroke:none"},g);
+    const t=el("text",{x:x+12,y:n.y+19},g);t.textContent=n.name.length>27?n.name.slice(0,26)+"…":n.name;
+    if(n.children){const c=el("text",{class:"cnt",x:x+NW-8,y:n.y+19,"text-anchor":"end"},g);c.textContent=n.collapsed?"+"+n.children.length:"−"}
+    const go=()=>{sel=n;if(n.children)n.collapsed=!n.collapsed;draw();show(n)};
+    g.addEventListener("click",go);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}});
+    kids(n).forEach(walk);
+  })(DATA);
+}
+function show(n){
+  const r=(l,v)=>v?`<dt>${l}</dt><dd>${v}</dd>`:"";
+  const st=n.status==="ok"?'<span class="badge" style="color:var(--ok)">є авторське визначення</span>':n.status==="check"?'<span class="badge" style="color:var(--chk)">треба перевірити</span>':"";
+  const src=(n.src||[]).map(([a,u])=>`<a href="${u}" target="_blank" rel="noopener">${a}</a>`).join("<br>");
+  info.innerHTML=`<h2>${n.name}</h2>${st}<dl>${r("Опис",n.note)}${r("Автор / бюро",n.architect)}${r("Проєкт",n.project)}${r("Рік",n.year)}${r("Джерела",src)}</dl>`;
+}
+function all(n,f){f(n);(n.children||[]).forEach(c=>all(c,f))}
+document.getElementById("ea").onclick=()=>{all(DATA,n=>n.collapsed=false);draw()};
+document.getElementById("ca").onclick=()=>{all(DATA,n=>{if(n.children)n.collapsed=n.d>=1});draw()};
+init(DATA,0);DATA.collapsed=false;DATA.children.forEach(c=>c.collapsed=false);sel=DATA;draw();show(DATA);
+</script>
+</body>
+</html>
